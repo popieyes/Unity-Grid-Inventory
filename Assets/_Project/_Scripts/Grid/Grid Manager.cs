@@ -13,12 +13,13 @@ public class GridManager : MonoBehaviour
     [SerializeField] private GameObject[] _items;
     [Header("Debug Parameters")]
     [SerializeField] private bool _debug = true;
+
     private Grid<Item> _grid;
     public Grid<Item> Grid => _grid;
     public Vector2Int Size => _gridSize;
     public Transform ItemContainer => _itemsContainer;
-
     private Vector3 _initialDebugPoint;
+
     #region ---- INITIALIZERS ----
     private void InitGrid()
     {
@@ -40,13 +41,15 @@ public class GridManager : MonoBehaviour
         {
             GameObject itemGO = Instantiate(item, _itemsContainer);
             Item itemComponent = itemGO.GetComponent<Item>();
+
             if (!CheckGrid(itemComponent, out Vector2Int freeSlot))
             {
                 itemGO.SetActive(false);
                 Debug.Log($"{itemGO} is too big for the grid or grid is already full.");
                 continue;
             }
-            itemComponent.Init(this, freeSlot);
+
+            itemComponent.Init(freeSlot);
             FillGrid(itemComponent);
         }
     }
@@ -69,24 +72,19 @@ public class GridManager : MonoBehaviour
     #endregion
 
     #region ---- ITEM MANAGING ----
-    public void FillGrid(Item item)
-    {
-        for (int row = -item.GridPos.y; row <= -item.GridPos.y + item.Size.y - 1; row++)
-        {
-            for (int col = item.GridPos.x; col <= item.GridPos.x + item.Size.x - 1; col++)
-            {
-                _grid.Array[col, row] = item;
-            }
-        }
-    }
+    public void FillGrid(Item item) => RunGridSegment(item.GridPos, item.Size, item);
 
-    public void FreeGrid(Item item)
+    public void FreeGrid(Item item) => RunGridSegment(item.GridPos, item.Size);
+
+    #endregion
+    #region ---- GRID CHECKING ----
+    private void RunGridSegment(Vector2Int itemPos, Vector2Int itemSize, Item value = null)
     {
-        for (int row = -item.GridPos.y; row <= -item.GridPos.y + item.Size.y - 1; row++)
+        for (int row = -itemPos.y; row < -itemPos.y + itemSize.y; row++)
         {
-            for (int col = item.GridPos.x; col <= item.GridPos.x + item.Size.x - 1; col++)
+            for (int col = itemPos.x; col < itemPos.x + itemSize.x; col++)
             {
-                _grid.Array[col, row] = null;
+                _grid.Array[col, row] = value;
             }
         }
     }
@@ -94,8 +92,38 @@ public class GridManager : MonoBehaviour
     public bool CheckGrid(Item item, out Vector2Int freeSlot)
     {
         var itemSize = item.Size;
-        freeSlot = Vector2Int.zero;
 
+        // Check horizontal orientation
+        if (ScanForFreeSlot(itemSize, out freeSlot))
+            return true;
+
+        // Check vertical orientation
+        itemSize = new Vector2Int(itemSize.y, itemSize.x);
+        // If it fits vertically, rotate the item
+        if (ScanForFreeSlot(itemSize, out freeSlot))
+        {
+            item.Rotate();
+            return true;
+        }
+
+        return false;
+    }
+    public bool CheckGrid(Vector2Int initialPos, Vector2Int itemSize)
+    {
+        for (int row = -initialPos.y; row < -initialPos.y + itemSize.y; row++)
+        {
+            for (int col = initialPos.x; col < initialPos.x + itemSize.x; col++)
+            {
+                if (col >= _gridSize.x || row >= _gridSize.y || _grid.Array[col, row] != null)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    private bool ScanForFreeSlot(Vector2Int itemSize, out Vector2Int freeSlot)
+    {
+        freeSlot = Vector2Int.zero;
         for (int row = 0; row <= _gridSize.y - itemSize.y; row++)
         {
             for (int col = 0; col <= _gridSize.x - itemSize.x; col++)
@@ -105,27 +133,11 @@ public class GridManager : MonoBehaviour
                 {
                     col += _grid.Array[col, row].Size.x - 1;
                     continue;
-
                 }
-                bool canPlace = true;
+
                 // If not check the size of the item inside the grid
+                bool canPlace = CheckGrid(new Vector2Int(col, -row), itemSize);
 
-                for (int itemRow = row; itemRow < row + itemSize.y; itemRow++)
-                {
-                    for (int itemCol = col; itemCol < col + itemSize.x; itemCol++)
-                    {
-                        if (itemCol >= _gridSize.x || itemRow >= _gridSize.y || _grid.Array[itemCol, itemRow] != null)
-                        {
-                            canPlace = false;
-                            break;
-                        }
-                    }
-                    if (!canPlace) break;
-                }
-
-              
-                
-                
                 if (canPlace)
                 {
                     freeSlot = new Vector2Int(col, -row);
@@ -133,60 +145,11 @@ public class GridManager : MonoBehaviour
                 }
             }
         }
-        
-        Vector2Int rotatedSize = new Vector2Int(itemSize.y, itemSize.x);
-        for (int row = 0; row <= _gridSize.y - rotatedSize.y; row++)
-        {
-            for (int col = 0; col <= _gridSize.x - rotatedSize.x; col++)
-            {
-                // If occuppied, jump the size
-                if (_grid.Array[col, row] != null)
-                {
-                    col += _grid.Array[col, row].Size.x - 1;
-                    continue;
-
-                }
-                bool canPlace = true;
-                // If not check the size of the item inside the grid
-
-                for (int itemRow = row; itemRow < row + rotatedSize.y; itemRow++)
-                {
-                    for (int itemCol = col; itemCol < col + rotatedSize.x; itemCol++)
-                    {
-                        if (itemCol >= _gridSize.x || itemRow >= _gridSize.y || _grid.Array[itemCol, itemRow] != null)
-                        {
-                            canPlace = false;
-                            break;
-                        }
-                    }
-                    if (!canPlace) break;
-                }
-
-                if (canPlace)
-                {
-                    item.Rotate();
-                    freeSlot = new Vector2Int(col, -row);
-                    return true;
-                }
-            }
-        }
-        return false;  
+        return false;
     }
 
-    public bool CheckGrid(Vector3 initialPosition, Vector2Int itemSize)
-    {
-        var currentPos = new Vector2Int((int)initialPosition.x, -(int)initialPosition.y);
-        for (int row = currentPos.y; row < currentPos.y + itemSize.y ; row++)
-        {
-            for (int col = currentPos.x; col < currentPos.x + itemSize.x; col++)
-            {
-                if (col >= _gridSize.x || row >= _gridSize.y || _grid.Array[col, row] != null)
-                    return false;
-            }
-        }
-        return true;
-    }
-
+    #endregion
+    #region ---- DEBUGGING ----
     private void DebugGrid()
     {
         if (_grid == null) return;
