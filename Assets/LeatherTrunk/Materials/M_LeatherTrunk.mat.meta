@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d03ef4843f55e5a439e05567e97e2638
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 295428
+  packageName: LeatherTrunk
+  packageVersion: 1.0
+  assetPath: Assets/LeatherTrunk/Materials/M_LeatherTrunk.mat
+  uploadId: 695537
